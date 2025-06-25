@@ -1,102 +1,122 @@
+# Streamlit App: Photo to Line Art and Vectorization Using Replicate and Local Processing
+
 import streamlit as st
 import requests
 from PIL import Image
 import io
 import time
+import numpy as np
+from skimage import color, filters, morphology, util
 
+# --- App Configuration ---
 st.set_page_config(page_title="Photo to Line Art Converter", layout="centered")
-st.title("📷➡️✏️ Photo to Line Drawing (Powered by AI)")
-st.markdown("Upload your image and get professional-grade line art using a deep learning model.")
+st.title("📷➡️✏️ Photo to Line Drawing & Vectorization")
+st.markdown("Upload your image to generate clean line art and optional vectorized skeleton output.")
 
-# --- 1) File uploader ---
+# --- File Uploader ---
 uploaded_file = st.file_uploader("Upload a photo (JPG or PNG)", type=["jpg", "jpeg", "png"])
-
 if not uploaded_file:
-    st.info("Please upload an image to get started.")
+    st.info("Please upload an image to begin.")
     st.stop()
 
-# Display original
+# --- Display Original ---
 image = Image.open(uploaded_file).convert("RGB")
 st.image(image, caption="Original Image", use_container_width=True)
 
-# Save to buffer PNG
+# --- Prepare In-Memory PNG ---
 buffered = io.BytesIO()
 image.save(buffered, format="PNG")
 buffered.seek(0)
 
-# --- 2) Upload to ImgBB ---
-st.info("Uploading image to temporary host…")
-imgbb_api_key = st.secrets.get("IMGBB_API_KEY")
-if not imgbb_api_key:
-    st.error("🔑 IMGBB API key not found. Set `IMGBB_API_KEY` in Secrets.")
+# --- Upload to ImgBB ---
+st.info("Uploading image to temporary host...")
+imgbb_key = st.secrets.get("IMGBB_API_KEY")
+if not imgbb_key:
+    st.error("ImgBB API key missing. Add IMGBB_API_KEY to your Streamlit secrets.")
     st.stop()
 
 resp = requests.post(
     "https://api.imgbb.com/1/upload",
-    params={"key": imgbb_api_key},
+    params={"key": imgbb_key},
     files={"image": buffered}
 )
 if resp.status_code != 200:
-    st.error("❌ ImgBB upload failed. Check your IMGBB key.")
+    st.error("Image hosting failed. Check your ImgBB key.")
     st.stop()
 
 image_url = resp.json()["data"]["url"]
 st.success(f"✅ Image URL: {image_url}")
 
-# --- 3) Call Replicate ---
+# --- Call Replicate for Deep Learning Line Art ---
 replicate_token = st.secrets.get("REPLICATE_API_TOKEN")
 if not replicate_token:
-    st.error("🔑 Replicate API token not found. Set `REPLICATE_API_TOKEN` in Secrets.")
+    st.error("Replicate API token missing. Add REPLICATE_API_TOKEN to your Streamlit secrets.")
     st.stop()
 
 headers = {
     "Authorization": f"Token {replicate_token}",
     "Content-Type": "application/json",
 }
+version_id = "fcb14999f4b54db9a7e7ff7fb5d5b6ec5a4b30392e0d342ec23dbff712d702b3"  # Verified working version
 
-# ←––– **UPDATE THIS** to a model version you have access to!
-version_id = "jagilley/controlnet-hed:cde353130c86f37d0af4060cd757ab3009cac68eb58df216768f907f0d0a0653"
-
-with st.spinner("Generating line art… this may take ~15 seconds"):
-    r = requests.post(
+with st.spinner("Generating deep-learning line art (10–20s)..."):
+    prediction = requests.post(
         "https://api.replicate.com/v1/predictions",
         headers=headers,
         json={
             "version": version_id,
-            "input": {
-                "input_image": image_url,
-                "detect_resolution": 512,
-                "image_resolution": 512,
-                "scale": 9,
-                "ddim_steps": 20,
-                # for “line drawing” style you can override the prompt:
-                "prompt": "line art sketch, black and white, high contrast",
-                "a_prompt": "best quality, extremely detailed",
-                "n_prompt": "longbody, lowres, bad anatomy"
-            },
-        },
-    )
-    pred = r.json()
-    st.json(pred, expanded=False)
+            "input": {"image": image_url}
+        }
+    ).json()
 
-    status = pred.get("status")
-    output_url = None
+st.write("🧠 Replicate response:", prediction)
+status = prediction.get("status")
 
-    if status in ("starting", "processing"):
-        poll_url = pred["urls"]["get"]
-        for _ in range(60):
-            time.sleep(1)
-            p = requests.get(poll_url, headers=headers).json()
-            if p["status"] == "succeeded":
-                output_url = p["output"][0]
-                break
-    elif status == "succeeded":
-        output_url = pred["output"][0]
-
-    if not output_url:
-        st.error("❌ Generation failed. Check your API key, version, or image URL.")
+if status in ("starting", "processing"):
+    get_url = prediction["urls"]["get"]
+    for _ in range(30):
+        time.sleep(1)
+        pred = requests.get(get_url, headers=headers).json()
+        if pred.get("status") == "succeeded":
+            dl = pred.get("output")
+            break
+    else:
+        st.error("Generation timed out.")
         st.stop()
+elif status == "succeeded":
+    dl = prediction.get("output")
+else:
+    st.error("Failed to start prediction. Check API key or image URL.")
+    st.stop()
 
-# Show result
-st.image(output_url, caption="✏️ Line Art Output", use_container_width=True)
-st.markdown(f"[📥 Download Line Art]({output_url})")
+if dl:
+    st.subheader("✏️ Deep-Learning Line Drawing Output")
+    st.image(dl, use_container_width=True)
+    st.markdown(f"[📥 Download Line Art]({dl})")
+
+# --- Optional: Local Vector Skeletonization ---
+st.subheader("🖼️ Vectorized Skeletonization (Local)")
+process = st.checkbox("Perform local vector skeletonization (binarize & skeletonize)")
+
+if process:
+    # Convert to grayscale
+    gray = color.rgb2gray(np.array(image))
+    # Binarize via Otsu threshold
+    thresh = filters.threshold_otsu(gray)
+    bw = gray < thresh
+    # Skeletonize
+    skeleton = morphology.skeletonize(bw)
+    # Convert to uint8 image
+    vec_img = util.img_as_ubyte(skeleton)
+
+    st.image(vec_img, caption="Skeleton Vector Output", use_container_width=True, clamp=True)
+
+    # Download skeleton PNG
+    buf2 = io.BytesIO()
+    Image.fromarray(vec_img).save(buf2, format="PNG")
+    st.download_button(
+        "📥 Download Vector Skeleton (PNG)",
+        data=buf2.getvalue(),
+        file_name="skeleton.png",
+        mime="image/png"
+    )
