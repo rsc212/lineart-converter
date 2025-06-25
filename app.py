@@ -48,19 +48,18 @@ with st.spinner(f"Converting to {mode.lower()}... this may take a few seconds"):
         output = cv2.bitwise_not(closed)
 
     else:  # Coloring Page
-        # Adaptive threshold for crisp lines
+        # Adaptive threshold for crisp lines (white lines on black background)
         thresh = cv2.adaptiveThreshold(
             gray, 255,
             cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY,
+            cv2.THRESH_BINARY_INV,
             blockSize=9,
             C=2
         )
-        # Invert so lines are black on white
-        inverted = cv2.bitwise_not(thresh)
         # Remove small noise
-        clean = cv2.morphologyEx(inverted, cv2.MORPH_OPEN, kernel)
-        output = clean
+        clean = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
+        # Invert so lines are black on white background
+        output = cv2.bitwise_not(clean)
 
 # --- Display & Download ---
 result_img = Image.fromarray(output)
