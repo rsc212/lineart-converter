@@ -59,7 +59,7 @@ if uploaded_file:
             "https://api.replicate.com/v1/predictions",
             headers=headers,
             json={
-                "version": "fcb14999f4b54db9a7e7ff7fb5d5b6ec5a4b30392e0d342ec23dbff712d702b3",  # updated version that works
+                "version": "fcb14999f4b54db9a7e7ff7fb5d5b6ec5a4b30392e0d342ec23dbff712d702b3",  # Working ControlNet version
                 "input": {
                     "image": image_url,
                     "detect_resolution": 768,
