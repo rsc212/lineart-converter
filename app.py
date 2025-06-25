@@ -23,7 +23,7 @@ if uploaded_file:
     image.save(buffered, format="PNG")
     buffered.seek(0)
 
-    # Upload image to ImgBB (or any image host that gives a public URL)
+    # Upload image to ImgBB
     st.info("Uploading image to temporary host...")
     imgbb_api_key = st.secrets.get("IMGBB_API_KEY")
     if not imgbb_api_key:
@@ -41,7 +41,7 @@ if uploaded_file:
         st.stop()
 
     image_url = res.json()["data"]["url"]
-    st.write("✅ Image URL:", image_url)  # DEBUG: Show image URL
+    st.write("✅ Image URL:", image_url)
 
     # --- Replicate API call ---
     replicate_api_token = st.secrets.get("REPLICATE_API_TOKEN")
@@ -59,7 +59,7 @@ if uploaded_file:
             "https://api.replicate.com/v1/predictions",
             headers=headers,
             json={
-                "version": "eff7bcd87c2bb1d4de0090634be9e6265ecf80e33e8eae0d4e8a38cd62d43e9a",
+                "version": "21e80ef1fd85dbe0e3c9bda24202c6e4f38ff8e7232b2047a9f674bc021e4dfb",  # latest model version
                 "input": {
                     "image": image_url,
                     "detect_resolution": 768,
@@ -69,7 +69,7 @@ if uploaded_file:
         )
 
         prediction = response.json()
-        st.write("🧠 Replicate response:", prediction)  # DEBUG: Show raw response
+        st.write("🧠 Replicate response:", prediction)
 
         status = prediction.get("status")
 
