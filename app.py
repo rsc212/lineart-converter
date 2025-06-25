@@ -5,6 +5,7 @@ import requests
 from PIL import Image
 import io
 import time
+import os
 
 st.set_page_config(page_title="Photo to Line Art Converter", layout="centered")
 st.title("📷➡️✏️ Photo to Line Drawing (Powered by AI)")
@@ -25,7 +26,11 @@ if uploaded_file:
 
     # Upload image to ImgBB (or any image host that gives a public URL)
     st.info("Uploading image to temporary host...")
-    imgbb_api_key = "3133ea3f79f14fa5f69fd937213d1cbb"
+    imgbb_api_key = os.getenv("IMGBB_API_KEY")
+    if not imgbb_api_key:
+        st.error("IMGBB API key not found. Please set it as an environment variable.")
+        st.stop()
+
     res = requests.post(
         "https://api.imgbb.com/1/upload",
         params={"key": imgbb_api_key},
@@ -39,9 +44,13 @@ if uploaded_file:
     image_url = res.json()["data"]["url"]
 
     # --- Replicate API call ---
-    REPLICATE_API_TOKEN = "r8_9Tp3jyb3oovS0ni0F7F910PjZXiiGgo4dWIFk"
+    replicate_api_token = os.getenv("REPLICATE_API_TOKEN")
+    if not replicate_api_token:
+        st.error("Replicate API key not found. Please set it as an environment variable.")
+        st.stop()
+
     headers = {
-        "Authorization": f"Token {REPLICATE_API_TOKEN}",
+        "Authorization": f"Token {replicate_api_token}",
         "Content-Type": "application/json",
     }
 
