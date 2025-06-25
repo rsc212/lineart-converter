@@ -1,4 +1,4 @@
-# Final upgrade: Clean, stylized line art using Laplacian edge detection
+# Line Art Conversion Web App – Final version with Laplacian edge detection
 
 import streamlit as st
 import cv2
@@ -46,4 +46,7 @@ if uploaded_file:
 
     st.download_button(
         label="Download Line Art PNG",
-        data=
+        data=byte_im,
+        file_name="lineart.png",
+        mime="image/png"
+    )
