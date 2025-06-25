@@ -1,4 +1,4 @@
-# Streamlit App: High-Quality Photo to Coloring Page Converter
+# Streamlit App: Photo to Coloring Page Converter
 
 import streamlit as st
 from PIL import Image
@@ -12,19 +12,19 @@ st.title("📷➡️🖍️ Photo to Coloring Page")
 st.markdown("Upload a photo to generate a high-quality printable coloring page.")
 
 # --- File Uploader ---
-uploaded = st.file_uploader("Upload a photo (JPG or PNG)", type=["jpg","jpeg","png"])
-if not uploaded:
+uploaded_file = st.file_uploader("Upload a photo (JPG or PNG)", type=["jpg","jpeg","png"])
+if not uploaded_file:
     st.info("Please upload an image to begin.")
     st.stop()
 
 # --- Load and Display Original ---
-image = Image.open(uploaded).convert("RGB")
+image = Image.open(uploaded_file).convert("RGB")
 st.subheader("Original Photo")
 st.image(image, use_container_width=True)
 
 # --- Convert to Coloring Page ---
 with st.spinner("Converting to coloring page..."):
-    # Convert PIL to OpenCV array
+    # Convert PIL to OpenCV BGR array
     arr = np.array(image)
     bgr = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
 
