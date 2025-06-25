@@ -24,7 +24,7 @@ if uploaded_file:
     image.save(buffered, format="PNG")
     buffered.seek(0)
 
-    # Upload image to ImgBB (or any image host that gives a public URL)
+    # Upload image to ImgBB
     st.info("Uploading image to temporary host...")
     imgbb_api_key = os.getenv("IMGBB_API_KEY")
     if not imgbb_api_key:
@@ -41,7 +41,7 @@ if uploaded_file:
         st.error("Image hosting failed. Check your ImgBB API key.")
         st.stop()
 
-    image_url = res.json()["data"]["image"]["url"]
+    image_url = res.json()["data"]["url"]
 
     # --- Replicate API call ---
     replicate_api_token = os.getenv("REPLICATE_API_TOKEN")
