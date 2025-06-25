@@ -1,10 +1,10 @@
-# Streamlit App: Photo to Line Art Using Replicate API
+# Streamlit App: Photo to Line Art Using Replicate API (with image upload to ImgBB)
 
 import streamlit as st
 import requests
 from PIL import Image
 import io
-import base64
+import time
 
 st.set_page_config(page_title="Photo to Line Art Converter", layout="centered")
 st.title("📷➡️✏️ Photo to Line Drawing (Powered by AI)")
@@ -18,13 +18,28 @@ if uploaded_file:
     image = Image.open(uploaded_file).convert("RGB")
     st.image(image, caption="Original Image", use_container_width=True)
 
-    # Convert image to base64 for Replicate API
+    # Save to buffer
     buffered = io.BytesIO()
     image.save(buffered, format="PNG")
-    img_base64 = base64.b64encode(buffered.getvalue()).decode()
+    buffered.seek(0)
+
+    # Upload image to ImgBB (or any image host that gives a public URL)
+    st.info("Uploading image to temporary host...")
+    imgbb_api_key = "YOUR_IMGBB_API_KEY"
+    res = requests.post(
+        "https://api.imgbb.com/1/upload",
+        params={"key": imgbb_api_key},
+        files={"image": buffered}
+    )
+
+    if res.status_code != 200:
+        st.error("Image hosting failed. Check your ImgBB API key.")
+        st.stop()
+
+    image_url = res.json()["data"]["url"]
 
     # --- Replicate API call ---
-    REPLICATE_API_TOKEN = st.secrets.get("REPLICATE_API_TOKEN") or "your-replicate-api-key"
+    REPLICATE_API_TOKEN = st.secrets["REPLICATE_API_TOKEN"]
     headers = {
         "Authorization": f"Token {REPLICATE_API_TOKEN}",
         "Content-Type": "application/json",
@@ -35,14 +50,11 @@ if uploaded_file:
             "https://api.replicate.com/v1/predictions",
             headers=headers,
             json={
-                "version": "cb4f8b62b431cf2b6d064e7d23647f39b6a63c012a4b9e65f8948a5e9f8a4261",
+                "version": "eff7bcd87c2bb1d4de0090634be9e6265ecf80e33e8eae0d4e8a38cd62d43e9a",
                 "input": {
-                    "image": f"data:image/png;base64,{img_base64}",
-                    "detect_resolution": 512,
-                    "image_resolution": 768,
-                    "scribble": False,
-                    "return_mask": False,
-                    "invert": True
+                    "image": image_url,
+                    "detect_resolution": 768,
+                    "image_resolution": 1024
                 }
             }
         )
@@ -50,9 +62,8 @@ if uploaded_file:
         prediction = response.json()
         status = prediction.get("status")
 
-        if status == "starting" or status == "processing":
+        if status in ["starting", "processing"]:
             prediction_url = prediction["urls"]["get"]
-            import time
             for _ in range(30):
                 time.sleep(1)
                 status_resp = requests.get(prediction_url, headers=headers).json()
@@ -65,9 +76,11 @@ if uploaded_file:
         elif status == "succeeded":
             output_url = prediction.get("output")
         else:
-            st.error("Failed to start prediction. Check API key or input.")
+            st.error("Failed to start prediction. Check Replicate API key or image URL.")
             st.stop()
 
-    # Show and enable download
-    st.image(output_url, caption="Line Drawing Output", use_container_width=True)
-    st.markdown(f"[Download Line Art PNG]({output_url})")
+    if output_url:
+        st.image(output_url, caption="Line Drawing Output", use_container_width=True)
+        st.markdown(f"[Download Line Art PNG]({output_url})")
+    else:
+        st.error("The model did not return an image. Please try again with a different photo.")
