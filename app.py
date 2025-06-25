@@ -1,5 +1,5 @@
-# Line Art Conversion Web App
-# Updated for better detail and compatibility with Streamlit Cloud
+# Line Art Conversion Web App (Enhanced)
+# Converts photos into clean, printable line drawings
 
 import streamlit as st
 import cv2
@@ -20,18 +20,22 @@ if uploaded_file:
     image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
     st.image(image, caption="Original Image", use_container_width=True)
 
-    # --- Preprocess ---
+    # --- Convert to Grayscale & Blur ---
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    blurred = cv2.GaussianBlur(gray, (3, 3), 0)
+    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
 
-    # --- Strong Line Art with Adaptive Threshold ---
-    line_art = cv2.adaptiveThreshold(
-        blurred, 255, cv2.ADAPTIVE_THRESH_MEAN_C,
-        cv2.THRESH_BINARY, blockSize=9, C=2
-    )
+    # --- Edge Detection ---
+    edges = cv2.Canny(blurred, threshold1=50, threshold2=150)
 
-    # --- Display Output ---
-    lineart_pil = Image.fromarray(line_art)
+    # --- Denoise with Morphological Close ---
+    kernel = np.ones((2, 2), np.uint8)
+    cleaned = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+
+    # --- Invert for Coloring Style ---
+    inverted = cv2.bitwise_not(cleaned)
+
+    # --- Display Result ---
+    lineart_pil = Image.fromarray(inverted)
     st.image(lineart_pil, caption="Line Drawing Output", use_container_width=True)
 
     # --- Download Button ---
