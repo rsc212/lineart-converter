@@ -59,11 +59,11 @@ if uploaded_file:
             "https://api.replicate.com/v1/predictions",
             headers=headers,
             json={
-                "version": "6e525cfa47b5e2c3025202c0fb490e9f6cbebd0e05e205a94cc2f82cc8d4474d",  # ControlNet lineart version
+                "version": "fcb14999f4b54db9a7e7ff7fb5d5b6ec5a4b30392e0d342ec23dbff712d702b3",  # updated version that works
                 "input": {
                     "image": image_url,
-                    "detect_resolution": 512,
-                    "image_resolution": 512
+                    "detect_resolution": 768,
+                    "image_resolution": 1024
                 }
             }
         )
@@ -72,6 +72,7 @@ if uploaded_file:
         st.write("🧠 Replicate response:", prediction)
 
         status = prediction.get("status")
+
         if status in ["starting", "processing"]:
             prediction_url = prediction["urls"]["get"]
             for _ in range(30):
