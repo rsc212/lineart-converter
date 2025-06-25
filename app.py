@@ -1,4 +1,3 @@
-```python
 # Streamlit App: Photo to Coloring Page & Line Drawing Converter
 
 import streamlit as st
