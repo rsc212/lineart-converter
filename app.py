@@ -1,59 +1,93 @@
+# app.py
+
 import streamlit as st
-import numpy as np
-import cv2
+import requests
 from PIL import Image
 import io
-from skimage.morphology import skeletonize
+import time
 
-st.set_page_config(page_title="Photo → Line Art", layout="wide")
-st.title("📷 ➡️ 🖊 Photo to Line Art")
+# — Page setup —
+st.set_page_config(page_title="Photo to Line Art Converter", layout="centered")
+st.title("📷➡️✏️ Photo to Line Drawing (Powered by AI)")
+st.markdown("Upload your image and get professional-grade line art via a deep learning model.")
 
-st.markdown(
-    """
-    Upload a photo and instantly get **print-ready**, **vector-style** line art.
-    This runs 100% in Python—no external APIs or hidden secrets.
-    """
-)
-
-uploaded = st.file_uploader("Upload JPG or PNG", type=["jpg", "jpeg", "png"])
+# — Upload widget —
+uploaded = st.file_uploader("Upload a photo (JPG or PNG)", type=["jpg", "jpeg", "png"])
 if not uploaded:
-    st.info("Please upload an image to proceed.")
     st.stop()
 
-# Read into OpenCV
-file_bytes = np.asarray(bytearray(uploaded.read()), dtype=np.uint8)
-orig = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-orig_rgb = cv2.cvtColor(orig, cv2.COLOR_BGR2RGB)
+# — Show input —
+img = Image.open(uploaded).convert("RGB")
+st.image(img, caption="Original Image", use_container_width=True)
 
-st.subheader("Original Photo")
-st.image(orig_rgb, use_column_width=True)
+# — Send to ImgBB to get a public URL —
+buffer = io.BytesIO()
+img.save(buffer, format="PNG")
+buffer.seek(0)
 
-# ---- Edge detection ----
-gray = cv2.cvtColor(orig, cv2.COLOR_BGR2GRAY)
-# You can tweak these thresholds interactively if you like:
-low_thresh, high_thresh = 50, 150
-edges = cv2.Canny(gray, low_thresh, high_thresh)
+imgbb_key = st.secrets.get("IMGBB_API_KEY")
+if not imgbb_key:
+    st.error("⚠️ IMGBB_API_KEY is missing. Add it under Settings → Secrets.")
+    st.stop()
 
-# ---- Skeletonize for crispness ----
-# skeletonize() expects boolean array (True=foreground)
-# we invert edges so white edges → True
-bw = edges > 0
-skel = skeletonize(bw)
-skel_u8 = (skel * 255).astype(np.uint8)
-
-# Convert back to PIL for display & download
-pil_line = Image.fromarray(skel_u8)
-
-st.subheader("🖊 Line Art Output")
-st.image(pil_line, use_column_width=True)
-
-# Download button
-buf = io.BytesIO()
-pil_line.save(buf, format="PNG")
-buf.seek(0)
-st.download_button(
-    "🚀 Download Line Art as PNG",
-    data=buf,
-    file_name="line_art.png",
-    mime="image/png"
+st.info("Uploading image to temporary host…")
+r = requests.post(
+    "https://api.imgbb.com/1/upload",
+    params={"key": imgbb_key},
+    files={"image": buffer},
 )
+if r.status_code != 200:
+    st.error("❌ ImgBB upload failed. Check your IMGBB_API_KEY.")
+    st.stop()
+
+image_url = r.json()["data"]["url"]
+st.success("✅ Image URL: " + image_url)
+
+# — Call Replicate —
+rep_key = st.secrets.get("REPLICATE_API_TOKEN")
+if not rep_key:
+    st.error("⚠️ REPLICATE_API_TOKEN is missing. Add it under Settings → Secrets.")
+    st.stop()
+
+headers = {
+    "Authorization": f"Token {rep_key}",
+    "Content-Type": "application/json",
+}
+
+st.info("Generating line art… this may take ~10–20s")
+payload = {
+    "version": "eff7bcd87c2bb1d4de0090634be9e6265ecf80e33e8eae0d4e8a38cd62d43e9a",  # make sure this is a valid version!
+    "input": {
+        "image": image_url,
+        "detect_resolution": 768,
+        "image_resolution": 1024
+    }
+}
+
+resp = requests.post("https://api.replicate.com/v1/predictions", headers=headers, json=payload)
+data = resp.json()
+st.write("🧠 Replicate response:", data)
+
+# — Poll until done —
+status = data.get("status")
+if status in ("starting", "processing"):
+    get_url = data["urls"]["get"]
+    for _ in range(30):
+        time.sleep(1)
+        poll = requests.get(get_url, headers=headers).json()
+        if poll["status"] == "succeeded":
+            out_url = poll["output"]
+            break
+    else:
+        st.error("❌ Generation timed out.")
+        st.stop()
+elif status == "succeeded":
+    out_url = data["output"]
+else:
+    st.error("❌ Failed to start prediction. Check your Replicate API key & version.")
+    st.stop()
+
+# — Show & download —
+st.header("✏️ Line Drawing Output")
+st.image(out_url, use_container_width=True)
+st.markdown(f"[📥 Download Line Art PNG]({out_url})")
