@@ -1,39 +1,54 @@
-# Streamlit App: Local Photo to Line Art Using OpenCV
-
+# app.py
 import streamlit as st
-import numpy as np
 import cv2
+import numpy as np
 from PIL import Image
+import io
 
 st.set_page_config(page_title="Photo to Line Art Converter", layout="centered")
-st.title("📷➡️✏️ Photo to Line Drawing")
-st.markdown("Upload your photo and get a crisp black-and-white line drawing instantly — no API needed!")
+st.title("📷➡️✏️ Photo to Line Drawing (Local)")
 
-# --- Upload ---
-uploaded_file = st.file_uploader("Upload a photo (JPG or PNG)", type=["jpg", "jpeg", "png"])
+st.markdown(
+    """
+    Upload a JPEG/PNG and this app will convert it into printable line art  
+    using OpenCV’s Canny edge detector—no external API calls needed.
+    """
+)
 
-if uploaded_file:
-    # Display original
-    image = Image.open(uploaded_file).convert("RGB")
-    st.image(image, caption="Original Image", use_container_width=True)
+uploaded = st.file_uploader("Upload a photo (JPG/PNG)", type=["jpg", "jpeg", "png"])
+if not uploaded:
+    st.info("Nothing uploaded yet.")
+    st.stop()
 
-    # Convert to OpenCV format
-    image_np = np.array(image)
-    image_gray = cv2.cvtColor(image_np, cv2.COLOR_RGB2GRAY)
-    image_blur = cv2.GaussianBlur(image_gray, (5, 5), 0)
+# 1) Read & show original
+img = Image.open(uploaded).convert("RGB")
+img_np = np.array(img)
+st.image(img_np, caption="Original Image", use_column_width=True)
 
-    # Invert and blend to get line effect
-    image_invert = cv2.bitwise_not(image_blur)
-    image_sketch = cv2.divide(image_gray, 255 - image_blur, scale=256)
+# 2) Convert to grayscale + blur
+gray = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+blur = cv2.GaussianBlur(gray, (5, 5), 0)
 
-    st.subheader("✏️ Line Drawing Output")
-    st.image(image_sketch, caption="Line Drawing", use_container_width=True, clamp=True)
+# 3) Canny edge detection
+edges = cv2.Canny(blur, threshold1=50, threshold2=150)
 
-    # Save and provide download
-    result = Image.fromarray(image_sketch)
-    st.download_button(
-        label="📥 Download Line Art",
-        data=cv2.imencode('.png', image_sketch)[1].tobytes(),
-        file_name="line_drawing.png",
-        mime="image/png"
-    )
+# 4) (Optional) Dilate to thicken lines
+kernel = np.ones((2, 2), np.uint8)
+dilated = cv2.dilate(edges, kernel, iterations=1)
+
+# 5) Invert so lines are black on white
+line_art = cv2.bitwise_not(dilated)
+
+st.header("✏️ Line Drawing Output")
+st.image(line_art, caption="Line Art", use_column_width=True)
+
+# 6) Provide download button
+buf = io.BytesIO()
+Image.fromarray(line_art).save(buf, format="PNG")
+buf.seek(0)
+st.download_button(
+    label="📥 Download Line Art (PNG)",
+    data=buf,
+    file_name="line_art.png",
+    mime="image/png",
+)
