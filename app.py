@@ -1,6 +1,5 @@
-
 # Line Art Conversion Web App
-# Requirements: streamlit, opencv-python, numpy, pillow
+# Updated for better detail and compatibility with Streamlit Cloud
 
 import streamlit as st
 import cv2
@@ -19,23 +18,21 @@ if uploaded_file:
     # Load image
     file_bytes = np.asarray(bytearray(uploaded_file.read()), dtype=np.uint8)
     image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
-    st.image(image, caption="Original Image", use_column_width=True)
+    st.image(image, caption="Original Image", use_container_width=True)
 
     # --- Preprocess ---
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    smooth = cv2.bilateralFilter(gray, 9, 75, 75)
+    blurred = cv2.GaussianBlur(gray, (3, 3), 0)
 
-    # --- Edge Detection ---
-    edges = cv2.Canny(smooth, threshold1=30, threshold2=100)
+    # --- Strong Line Art with Adaptive Threshold ---
+    line_art = cv2.adaptiveThreshold(
+        blurred, 255, cv2.ADAPTIVE_THRESH_MEAN_C,
+        cv2.THRESH_BINARY, blockSize=9, C=2
+    )
 
-    # --- Post-process for clean print ---
-    kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 2))
-    cleaned = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
-    inverted = cv2.bitwise_not(cleaned)
-
-    # --- Convert for Display ---
-    lineart_pil = Image.fromarray(inverted)
-    st.image(lineart_pil, caption="Line Drawing Output", use_column_width=True)
+    # --- Display Output ---
+    lineart_pil = Image.fromarray(line_art)
+    st.image(lineart_pil, caption="Line Drawing Output", use_container_width=True)
 
     # --- Download Button ---
     buf = io.BytesIO()
