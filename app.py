@@ -1,5 +1,5 @@
-```python
 # app.py
+
 import streamlit as st
 import cv2
 import numpy as np
@@ -38,13 +38,12 @@ blurred = cv2.GaussianBlur(gray, (5, 5), 0)
 edges = cv2.Canny(blurred, threshold1=50, threshold2=150)
 
 # Dilate to close small gaps
-kernel = np.ones((2,2), np.uint8)
+kernel = np.ones((2, 2), np.uint8)
 dilated = cv2.dilate(edges, kernel, iterations=1)
 
 # Skeletonize: convert to boolean then skimage skeletonize
 binary = dilated > 0
 skeleton = skeletonize(binary)
-# Convert skeleton back to uint8 for display
 skeleton_img = (skeleton.astype(np.uint8) * 255)
 
 st.header("✏️ Skeletonized Line Art")
@@ -57,23 +56,25 @@ path = bmp.trace()
 # Build SVG from traced paths
 def paths_to_svg(path_obj, width, height):
     svg_parts = [
-        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" ' +
+        f'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {width} {height}" '
         'xmlns:xlink="http://www.w3.org/1999/xlink">'
     ]
     for curve in path_obj:
         svg_parts.append('<path d="')
         # Move to start point
-        start = curve.start_point
-        svg_parts.append(f'M {start[0]} {start[1]} ')
+        sx, sy = curve.start_point
+        svg_parts.append(f'M {sx} {sy} ')
         for segment in curve.segments:
             if segment.is_corner:
-                c = segment.c
-                svg_parts.append(f'L {c[0]} {c[1]} ')
+                cx, cy = segment.c
+                svg_parts.append(f'L {cx} {cy} ')
             else:
-                c1, c2 = segment.c1, segment.c2
-                end = segment.end_point
-                svg_parts.append(f'C {c1[0]} {c1[1]}, {c2[0]} {c2[1]}, {end[0]} {end[1]} ')
-        svg_parts.append('Z" fill="none" stroke="black" stroke-width="1"/>')
+                (c1x, c1y), (c2x, c2y) = segment.c1, segment.c2
+                ex, ey = segment.end_point
+                svg_parts.append(
+                    f'C {c1x} {c1y}, {c2x} {c2y}, {ex} {ey} '
+                )
+        svg_parts.append('" fill="none" stroke="black" stroke-width="1"/>')
     svg_parts.append('</svg>')
     return "".join(svg_parts)
 
@@ -90,5 +91,4 @@ st.download_button(
 
 # Optional: show raw SVG markup for inspection
 with st.expander("Show raw SVG code"):
-    st.code(svg_data, language='xml')
-```
+    st.code(svg_data, language="xml")
