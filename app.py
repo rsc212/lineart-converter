@@ -5,7 +5,6 @@ import requests
 from PIL import Image
 import io
 import time
-import os
 
 st.set_page_config(page_title="Photo to Line Art Converter", layout="centered")
 st.title("📷➡️✏️ Photo to Line Drawing (Powered by AI)")
@@ -24,11 +23,11 @@ if uploaded_file:
     image.save(buffered, format="PNG")
     buffered.seek(0)
 
-    # Upload image to ImgBB
+    # Upload image to ImgBB (or any image host that gives a public URL)
     st.info("Uploading image to temporary host...")
-    imgbb_api_key = os.getenv("IMGBB_API_KEY")
+    imgbb_api_key = st.secrets.get("IMGBB_API_KEY")
     if not imgbb_api_key:
-        st.error("IMGBB API key not found. Please set it as an environment variable.")
+        st.error("IMGBB API key not found. Please set it as a Streamlit secret.")
         st.stop()
 
     res = requests.post(
@@ -42,11 +41,12 @@ if uploaded_file:
         st.stop()
 
     image_url = res.json()["data"]["url"]
+    st.write("✅ Image URL:", image_url)  # DEBUG: Show image URL
 
     # --- Replicate API call ---
-    replicate_api_token = os.getenv("REPLICATE_API_TOKEN")
+    replicate_api_token = st.secrets.get("REPLICATE_API_TOKEN")
     if not replicate_api_token:
-        st.error("Replicate API key not found. Please set it as an environment variable.")
+        st.error("Replicate API key not found. Please set it as a Streamlit secret.")
         st.stop()
 
     headers = {
@@ -69,6 +69,8 @@ if uploaded_file:
         )
 
         prediction = response.json()
+        st.write("🧠 Replicate response:", prediction)  # DEBUG: Show raw response
+
         status = prediction.get("status")
 
         if status in ["starting", "processing"]:
