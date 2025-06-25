@@ -1,5 +1,4 @@
-# Line Art Conversion Web App (Enhanced)
-# Converts photos into clean, printable line drawings
+# Final upgrade: Clean, stylized line art using Laplacian edge detection
 
 import streamlit as st
 import cv2
@@ -20,22 +19,24 @@ if uploaded_file:
     image = cv2.imdecode(file_bytes, cv2.IMREAD_COLOR)
     st.image(image, caption="Original Image", use_container_width=True)
 
-    # --- Convert to Grayscale & Blur ---
+    # --- Convert to Grayscale ---
     gray = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-    blurred = cv2.GaussianBlur(gray, (5, 5), 0)
 
-    # --- Edge Detection ---
-    edges = cv2.Canny(blurred, threshold1=50, threshold2=150)
+    # --- Enhance Contrast ---
+    norm = cv2.equalizeHist(gray)
 
-    # --- Denoise with Morphological Close ---
-    kernel = np.ones((2, 2), np.uint8)
-    cleaned = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
+    # --- Apply Gaussian Blur ---
+    blurred = cv2.GaussianBlur(norm, (3, 3), 0)
 
-    # --- Invert for Coloring Style ---
-    inverted = cv2.bitwise_not(cleaned)
+    # --- Laplacian Edge Detection ---
+    laplacian = cv2.Laplacian(blurred, cv2.CV_8U, ksize=5)
+    inverted = cv2.bitwise_not(laplacian)
 
-    # --- Display Result ---
-    lineart_pil = Image.fromarray(inverted)
+    # --- Threshold to Binary for Clean Line Look ---
+    _, binary = cv2.threshold(inverted, 150, 255, cv2.THRESH_BINARY)
+
+    # --- Display Output ---
+    lineart_pil = Image.fromarray(binary)
     st.image(lineart_pil, caption="Line Drawing Output", use_container_width=True)
 
     # --- Download Button ---
@@ -45,7 +46,4 @@ if uploaded_file:
 
     st.download_button(
         label="Download Line Art PNG",
-        data=byte_im,
-        file_name="lineart.png",
-        mime="image/png"
-    )
+        data=
