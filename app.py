@@ -1,3 +1,5 @@
+# Streamlit App: High-Quality Photo to Coloring Page Converter
+
 import streamlit as st
 from PIL import Image
 import numpy as np
@@ -22,17 +24,17 @@ st.image(image, use_container_width=True)
 
 # --- Convert to Coloring Page ---
 with st.spinner("Converting to coloring page..."):
-    # Convert PIL to OpenCV BGR
+    # Convert PIL to OpenCV array
     arr = np.array(image)
     bgr = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
 
-    # 1) Smooth while preserving edges
+    # 1. Smooth image while preserving edges
     blurred = cv2.bilateralFilter(bgr, d=9, sigmaColor=75, sigmaSpace=75)
 
-    # 2) Grayscale
+    # 2. Convert to grayscale
     gray = cv2.cvtColor(blurred, cv2.COLOR_BGR2GRAY)
 
-    # 3) Adaptive threshold for crisp lines
+    # 3. Adaptive threshold for crisp lines
     thresh = cv2.adaptiveThreshold(
         gray, 255,
         cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
@@ -41,14 +43,14 @@ with st.spinner("Converting to coloring page..."):
         C=2
     )
 
-    # 4) Invert (so lines are black on white)
+    # 4. Invert so lines are black on white
     coloring = cv2.bitwise_not(thresh)
 
-    # 5) Clean small noise
+    # 5. Clean small noise
     kernel = np.ones((2,2), np.uint8)
     clean = cv2.morphologyEx(coloring, cv2.MORPH_OPEN, kernel)
 
-# Convert back to PIL and show
+# --- Display & Download ---
 result = Image.fromarray(clean)
 st.subheader("🖍️ Coloring Page Output")
 st.image(result, use_container_width=True)
