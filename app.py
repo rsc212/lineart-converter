@@ -41,7 +41,7 @@ if uploaded_file:
         st.error("Image hosting failed. Check your ImgBB API key.")
         st.stop()
 
-    image_url = res.json()["data"]["url"]
+    image_url = res.json()["data"]["image"]["url"]
 
     # --- Replicate API call ---
     replicate_api_token = os.getenv("REPLICATE_API_TOKEN")
