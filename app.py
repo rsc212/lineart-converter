@@ -25,7 +25,7 @@ if uploaded_file:
 
     # Upload image to ImgBB (or any image host that gives a public URL)
     st.info("Uploading image to temporary host...")
-    imgbb_api_key = "YOUR_IMGBB_API_KEY"
+    imgbb_api_key = "3133ea3f79f14fa5f69fd937213d1cbb"
     res = requests.post(
         "https://api.imgbb.com/1/upload",
         params={"key": imgbb_api_key},
@@ -39,7 +39,7 @@ if uploaded_file:
     image_url = res.json()["data"]["url"]
 
     # --- Replicate API call ---
-    REPLICATE_API_TOKEN = st.secrets["REPLICATE_API_TOKEN"]
+    REPLICATE_API_TOKEN = "r8_9Tp3jyb3oovS0ni0F7F910PjZXiiGgo4dWIFk"
     headers = {
         "Authorization": f"Token {REPLICATE_API_TOKEN}",
         "Content-Type": "application/json",
