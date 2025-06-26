@@ -4,6 +4,7 @@ import numpy as np
 import cv2
 import requests
 import io
+from lineart_pipeline import custom_lineart_pipeline  # <-- Make sure this is in your repo
 
 st.set_page_config(page_title="Photo to Vector-Style Coloring Page", layout="centered")
 st.title("📷➡️🖍️ Photo to Line Art & Vector Coloring Page")
@@ -19,33 +20,23 @@ image = Image.open(uploaded_file).convert("RGB")
 st.subheader("Original Photo")
 st.image(image, use_container_width=True)
 
-# Processing: grayscale, blur, adaptive threshold, median, etc.
+# --- PROCESSING WITH YOUR PIPELINE ---
 with st.spinner("Processing image for clean line art..."):
     arr = np.array(image)
-    gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
-    blur = cv2.GaussianBlur(gray, (5, 5), 0)
-    adapt = cv2.adaptiveThreshold(
-        blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-        cv2.THRESH_BINARY, 11, 2
-    )
-    median = cv2.medianBlur(adapt, 3)
-    sketch = cv2.Canny(median, 50, 150)
-    blur2 = cv2.GaussianBlur(sketch, (3, 3), 0)
-    median2 = cv2.medianBlur(blur2, 3)
-    output = cv2.bitwise_not(median2)
+    output = custom_lineart_pipeline(arr)
 
 lineart_img = Image.fromarray(output)
 st.subheader("🖍️ Line Art (Raster)")
 st.image(lineart_img, use_container_width=True)
 
-# Save PNG to buffer
+# Save PNG to buffer for download/API
 buf = io.BytesIO()
 lineart_img.save(buf, format="PNG")
 buf.seek(0)
 
 st.download_button("Download PNG", data=buf, file_name="lineart.png", mime="image/png")
 
-# --- Vectorization step via Hugging Face API ---
+# --- VECTORIZE TO SVG VIA HUGGING FACE API ---
 st.subheader("🪄 Convert to SVG (Vector) via Hugging Face API")
 if st.button("Vectorize (Export as SVG)"):
     st.info("Sending to Hugging Face openfree/image-to-vector API...")
