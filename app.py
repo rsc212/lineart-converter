@@ -2,73 +2,68 @@ import streamlit as st
 from PIL import Image
 import numpy as np
 import cv2
+import requests
 import io
 
-# --- App Configuration ---
-st.set_page_config(page_title="Photo to Vector-Style Line Art", layout="centered")
-st.title("📷➡️🖍️ Photo to Vector-Style Line Art & Coloring Page")
-st.markdown("Upload a photo and instantly convert it into a crisp line drawing or coloring-page vector style.")
+st.set_page_config(page_title="Photo to Vector-Style Coloring Page", layout="centered")
+st.title("📷➡️🖍️ Photo to Line Art & Vector Coloring Page")
+st.markdown("Upload a photo, convert it to clean line art, and export as SVG (vector).")
 
-# --- Select Mode ---
-mode = st.radio("Choose output style:", ["Line Drawing", "Coloring Page"])
-
-# --- Upload Image ---
-uploaded_file = st.file_uploader("Upload a photo (JPG or PNG)", type=["jpg","jpeg","png"])
+uploaded_file = st.file_uploader("Upload a photo (JPG or PNG)", type=["jpg", "jpeg", "png"])
 if not uploaded_file:
-    st.info("Please upload an image to get started.")
+    st.info("Please upload an image to begin.")
     st.stop()
 
-# --- Load Image ---
+# Show original
 image = Image.open(uploaded_file).convert("RGB")
 st.subheader("Original Photo")
 st.image(image, use_container_width=True)
 
-# --- Convert to OpenCV Format ---
-arr = np.array(image)
-bgr = cv2.cvtColor(arr, cv2.COLOR_RGB2BGR)
+# Processing: grayscale, blur, adaptive threshold, median, etc.
+with st.spinner("Processing image for clean line art..."):
+    arr = np.array(image)
+    gray = cv2.cvtColor(arr, cv2.COLOR_RGB2GRAY)
+    blur = cv2.GaussianBlur(gray, (5, 5), 0)
+    adapt = cv2.adaptiveThreshold(
+        blur, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
+        cv2.THRESH_BINARY, 11, 2
+    )
+    median = cv2.medianBlur(adapt, 3)
+    sketch = cv2.Canny(median, 50, 150)
+    blur2 = cv2.GaussianBlur(sketch, (3, 3), 0)
+    median2 = cv2.medianBlur(blur2, 3)
+    output = cv2.bitwise_not(median2)
 
-# --- Processing Spinner ---
-with st.spinner(f"Converting to {mode.lower()}... this may take a few seconds"):
-    # Smooth and grayscale
-    smoothed = cv2.bilateralFilter(bgr, d=9, sigmaColor=75, sigmaSpace=75)
-    gray = cv2.cvtColor(smoothed, cv2.COLOR_BGR2GRAY)
+lineart_img = Image.fromarray(output)
+st.subheader("🖍️ Line Art (Raster)")
+st.image(lineart_img, use_container_width=True)
 
-    # Kernel for morphology
-    kernel = np.ones((2,2), np.uint8)
+# Save PNG to buffer
+buf = io.BytesIO()
+lineart_img.save(buf, format="PNG")
+buf.seek(0)
 
-    if mode == "Line Drawing":
-        # Canny edges
-        edges = cv2.Canny(gray, 50, 150)
-        # Close small gaps
-        closed = cv2.morphologyEx(edges, cv2.MORPH_CLOSE, kernel)
-        # Invert: lines black on white
-        processed = cv2.bitwise_not(closed)
+st.download_button("Download PNG", data=buf, file_name="lineart.png", mime="image/png")
 
+# --- Vectorization step via Hugging Face API ---
+st.subheader("🪄 Convert to SVG (Vector) via Hugging Face API")
+if st.button("Vectorize (Export as SVG)"):
+    st.info("Sending to Hugging Face openfree/image-to-vector API...")
+    buf.seek(0)
+    response = requests.post(
+        "https://hf.space/embed/openfree/image-to-vector/api/predict/",
+        files={"image": ("lineart.png", buf, "image/png")},
+        timeout=120
+    )
+    if response.status_code == 200:
+        svg_url = response.json()["data"][0]
+        svg_response = requests.get(svg_url)
+        if svg_response.status_code == 200:
+            st.success("SVG ready! Download below.")
+            st.download_button("Download SVG", data=svg_response.content,
+                               file_name="vector_coloring_page.svg", mime="image/svg+xml")
+            st.markdown(f"[Open SVG in new tab]({svg_url})")
+        else:
+            st.error("Failed to download SVG from Hugging Face.")
     else:
-        # Adaptive threshold (binary inverse)
-        thresh = cv2.adaptiveThreshold(
-            gray, 255,
-            cv2.ADAPTIVE_THRESH_GAUSSIAN_C,
-            cv2.THRESH_BINARY_INV,
-            blockSize=9, C=2
-        )
-        # Remove small artifacts
-        clean = cv2.morphologyEx(thresh, cv2.MORPH_OPEN, kernel)
-        # Invert: lines black on white
-        processed = cv2.bitwise_not(clean)
-
-# --- Display Result ---
-result = Image.fromarray(processed)
-st.subheader(f"Output: {mode}")
-st.image(result, use_container_width=True)
-
-# --- Download Button ---
-buffer = io.BytesIO()
-result.save(buffer, format="PNG")
-buffer.seek(0)
-st.download_button(
-    label=f"Download {mode}",
-    data=buffer,
-    file_name=("line_drawing.png" if mode=="Line Drawing" else "coloring_page.png"),
-    mime="image/png"
-)
+        st.error("Error with Hugging Face API request.")
